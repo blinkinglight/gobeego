@@ -7,7 +7,6 @@ import (
 
 	"github.com/blinkinglight/bee"
 	"github.com/blinkinglight/bee/co"
-	"github.com/blinkinglight/bee/gen"
 	"github.com/blinkinglight/bee/ro"
 	"github.com/blinkinglight/gobeego/apps/banking"
 	"github.com/delaneyj/toolbelt/embeddednats"
@@ -74,47 +73,16 @@ func TestMain(t *testing.T) {
 	service := &banking.PaymentService{}
 	go bee.Command(ctx, service, co.WithAggreate(banking.Aggregate))
 
-	createAccount1 := &banking.CreateAccountCommand{
-		AccountID: "54321",
-		Currency:  "USD",
-		Balance:   0,
-		Ref:       "create-54321",
-	}
-	createCmd := &gen.CommandEnvelope{
-		AggregateId: "54321",
-		Aggregate:   banking.Aggregate,
-		CommandType: "create",
-	}
-	bee.PublishCommand(ctx, createCmd, createAccount1)
+	createCmd1 := banking.CreateAccount("54321", "USD", 0, "create-54321")
+	bee.PublishCommand(ctx, createCmd1, nil)
 
-	createAccount2 := &banking.CreateAccountCommand{
-		AccountID: "12345",
-		Currency:  "USD",
-		Balance:   0,
-		Ref:       "create-12345",
-	}
-	createCmd2 := &gen.CommandEnvelope{
-		AggregateId: "12345",
-		Aggregate:   banking.Aggregate,
-		CommandType: "create",
-	}
-	bee.PublishCommand(ctx, createCmd2, createAccount2)
+	createCmd2 := banking.CreateAccount("12345", "USD", 0, "create-12345")
+	bee.PublishCommand(ctx, createCmd2, nil)
 
 	time.Sleep(100 * time.Millisecond) // Wait for events to be processed
 
-	ev := &banking.CreditAccountCommand{
-		ToAccountID:   "12345",
-		FromAccountID: "CASH",
-		Amount:        1000,
-		Ref:           "payment-001",
-	}
-	event := &gen.CommandEnvelope{
-		AggregateId: "12345",
-		Aggregate:   banking.Aggregate,
-		CommandType: banking.CreditCommand,
-	}
-
-	bee.PublishCommand(ctx, event, ev)
+	creditCmd := banking.CreditAccount("CASH", "12345", 1000, "payment-001")
+	bee.PublishCommand(ctx, creditCmd, nil)
 
 	time.Sleep(100 * time.Millisecond) // Wait for events to be processed
 
@@ -125,18 +93,8 @@ func TestMain(t *testing.T) {
 		t.Errorf("Expected balance to be 1000, got %v", agg.Balance)
 	}
 
-	debitCmd := &banking.DebitAccountCommand{
-		FromAccountID: "12345",
-		ToAccountID:   "54321",
-		Amount:        1000,
-		Ref:           "payment-001",
-	}
-	cmdd := &gen.CommandEnvelope{
-		AggregateId: "12345",
-		Aggregate:   banking.Aggregate,
-		CommandType: banking.DebitCommand,
-	}
-	bee.PublishCommand(ctx, cmdd, debitCmd)
+	debitCmd := banking.DebitAccount("12345", "54321", 1000, "payment-001")
+	bee.PublishCommand(ctx, debitCmd, nil)
 
 	time.Sleep(100 * time.Millisecond) // Wait for events to be processed
 
