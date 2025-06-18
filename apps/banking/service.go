@@ -13,11 +13,11 @@ type PaymentService struct{}
 
 func (s *PaymentService) Handle(ctx context.Context, m *gen.CommandEnvelope) ([]*gen.EventEnvelope, error) {
 	agg := &PaymentAggregate{ID: m.AggregateId}
-	bee.Replay(ctx, agg, ro.WithAggreate("payments"), ro.WithAggregateID(m.AggregateId))
+	bee.Replay(ctx, agg, ro.WithAggreate(m.Aggregate), ro.WithAggregateID(m.AggregateId))
 
-	if agg.found && m.CommandType == "create" {
+	if agg.found && m.CommandType == CreateCommand {
 		return nil, errors.New("account already exists")
-	} else if !agg.found && m.CommandType != "create" {
+	} else if !agg.found && m.CommandType != CreateCommand {
 		return nil, errors.New("account does not exist")
 	}
 

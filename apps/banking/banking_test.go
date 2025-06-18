@@ -2,7 +2,6 @@ package banking_test
 
 import (
 	"context"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -17,27 +16,26 @@ import (
 )
 
 func init() {
-	bee.RegisterEvent[banking.AccountDebited]("payments", "debited")
-	bee.RegisterEvent[banking.AccountCredited]("payments", "credited")
-	bee.RegisterEvent[banking.AccountCreated]("payments", "created")
+	bee.RegisterEvent[banking.AccountDebited](banking.Aggregate, banking.DebitedEvent)
+	bee.RegisterEvent[banking.AccountCredited](banking.Aggregate, banking.CreditedEvent)
+	bee.RegisterEvent[banking.AccountCreated](banking.Aggregate, banking.CreatedEvent)
 
-	bee.RegisterCommand[banking.DebitAccountCommand]("payments", "debit")
-	bee.RegisterCommand[banking.CreditAccountCommand]("payments", "credit")
-	bee.RegisterCommand[banking.CreateAccountCommand]("payments", "create")
+	bee.RegisterCommand[banking.DebitAccountCommand](banking.Aggregate, banking.DebitCommand)
+	bee.RegisterCommand[banking.CreditAccountCommand](banking.Aggregate, banking.CreditCommand)
+	bee.RegisterCommand[banking.CreateAccountCommand](banking.Aggregate, banking.CreateCommand)
 }
 
 func client() (*nats.Conn, func(), error) {
 	server, err := embeddednats.New(
 		context.Background(),
 		embeddednats.WithShouldClearData(true),
-		embeddednats.WithDirectory("tmppas2"),
 		embeddednats.WithNATSServerOptions(&server.Options{
 			JetStream:    true,
 			NoLog:        false,
 			Debug:        true,
 			Trace:        true,
 			TraceVerbose: true,
-			Port:         rand.Intn(10000) + 1024,
+			Port:         4333,
 		}),
 	)
 	if err != nil {
@@ -74,7 +72,7 @@ func TestMain(t *testing.T) {
 	ctx = bee.WithJetStream(ctx, js)
 
 	service := &banking.PaymentService{}
-	go bee.Command(ctx, service, co.WithAggreate("payments"))
+	go bee.Command(ctx, service, co.WithAggreate(banking.Aggregate))
 
 	createAccount1 := &banking.CreateAccountCommand{
 		AccountID: "54321",
@@ -84,7 +82,7 @@ func TestMain(t *testing.T) {
 	}
 	createCmd := &gen.CommandEnvelope{
 		AggregateId: "54321",
-		Aggregate:   "payments",
+		Aggregate:   banking.Aggregate,
 		CommandType: "create",
 	}
 	bee.PublishCommand(ctx, createCmd, createAccount1)
@@ -97,7 +95,7 @@ func TestMain(t *testing.T) {
 	}
 	createCmd2 := &gen.CommandEnvelope{
 		AggregateId: "12345",
-		Aggregate:   "payments",
+		Aggregate:   banking.Aggregate,
 		CommandType: "create",
 	}
 	bee.PublishCommand(ctx, createCmd2, createAccount2)
@@ -112,8 +110,8 @@ func TestMain(t *testing.T) {
 	}
 	event := &gen.CommandEnvelope{
 		AggregateId: "12345",
-		Aggregate:   "payments",
-		CommandType: "credit",
+		Aggregate:   banking.Aggregate,
+		CommandType: banking.CreditCommand,
 	}
 
 	bee.PublishCommand(ctx, event, ev)
@@ -121,7 +119,7 @@ func TestMain(t *testing.T) {
 	time.Sleep(100 * time.Millisecond) // Wait for events to be processed
 
 	agg := &banking.AccountAggregate{ID: "12345"}
-	bee.Replay(ctx, agg, ro.WithAggreate("payments"), ro.WithAggregateID("12345"))
+	bee.Replay(ctx, agg, ro.WithAggreate(banking.Aggregate), ro.WithAggregateID("12345"))
 
 	if agg.Balance != 1000 {
 		t.Errorf("Expected balance to be 1000, got %v", agg.Balance)
@@ -135,22 +133,22 @@ func TestMain(t *testing.T) {
 	}
 	cmdd := &gen.CommandEnvelope{
 		AggregateId: "12345",
-		Aggregate:   "payments",
-		CommandType: "debit",
+		Aggregate:   banking.Aggregate,
+		CommandType: banking.DebitCommand,
 	}
 	bee.PublishCommand(ctx, cmdd, debitCmd)
 
 	time.Sleep(100 * time.Millisecond) // Wait for events to be processed
 
 	agg = &banking.AccountAggregate{ID: "12345"}
-	bee.Replay(ctx, agg, ro.WithAggreate("payments"), ro.WithAggregateID("12345"))
+	bee.Replay(ctx, agg, ro.WithAggreate(banking.Aggregate), ro.WithAggregateID("12345"))
 
 	if agg.Balance != 0 {
 		t.Errorf("Expected balance to be 0 after debit, got %v", agg.Balance)
 	}
 
 	agg = &banking.AccountAggregate{ID: "54321"}
-	bee.Replay(ctx, agg, ro.WithAggreate("payments"), ro.WithAggregateID("54321"))
+	bee.Replay(ctx, agg, ro.WithAggreate(banking.Aggregate), ro.WithAggregateID("54321"))
 
 	if agg.Balance != 1000 {
 		t.Errorf("Expected balance of account 54321 to be 1000 after credit, got %v", agg.Balance)
