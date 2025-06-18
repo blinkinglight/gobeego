@@ -19,9 +19,11 @@ import (
 func init() {
 	bee.RegisterEvent[banking.AccountDebited]("payments", "debited")
 	bee.RegisterEvent[banking.AccountCredited]("payments", "credited")
+	bee.RegisterEvent[banking.AccountCreated]("payments", "created")
 
 	bee.RegisterCommand[banking.DebitAccountCommand]("payments", "debit")
 	bee.RegisterCommand[banking.CreditAccountCommand]("payments", "credit")
+	bee.RegisterCommand[banking.CreateAccountCommand]("payments", "create")
 }
 
 func client() (*nats.Conn, func(), error) {
@@ -73,6 +75,34 @@ func TestMain(t *testing.T) {
 
 	service := &banking.PaymentService{}
 	go bee.Command(ctx, service, co.WithAggreate("payments"))
+
+	createAccount1 := &banking.CreateAccountCommand{
+		AccountID: "54321",
+		Currency:  "USD",
+		Balance:   0,
+		Ref:       "create-54321",
+	}
+	createCmd := &gen.CommandEnvelope{
+		AggregateId: "54321",
+		Aggregate:   "payments",
+		CommandType: "create",
+	}
+	bee.PublishCommand(ctx, createCmd, createAccount1)
+
+	createAccount2 := &banking.CreateAccountCommand{
+		AccountID: "12345",
+		Currency:  "USD",
+		Balance:   0,
+		Ref:       "create-12345",
+	}
+	createCmd2 := &gen.CommandEnvelope{
+		AggregateId: "12345",
+		Aggregate:   "payments",
+		CommandType: "create",
+	}
+	bee.PublishCommand(ctx, createCmd2, createAccount2)
+
+	time.Sleep(100 * time.Millisecond) // Wait for events to be processed
 
 	ev := &banking.CreditAccountCommand{
 		ToAccountID:   "12345",

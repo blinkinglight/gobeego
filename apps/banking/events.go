@@ -15,3 +15,11 @@ type AccountCredited struct {
 	NewBalance int64  `json:"new_balance"`
 	Timestamp  int64  `json:"timestamp"`
 }
+
+type AccountCreated struct {
+	AccountID string `json:"account_id"`
+	Currency  string `json:"currency"`
+	Balance   int64  `json:"balance"`
+	Ref       string `json:"ref"` // e.g. PaymentID
+	Timestamp int64  `json:"timestamp"`
+}

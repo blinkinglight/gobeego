@@ -42,6 +42,8 @@ type PaymentAggregate struct {
 	ID       string
 	Balance  int64 // pvz. centais
 	Currency string
+
+	found bool
 }
 
 func (a *PaymentAggregate) ApplyEvent(e *gen.EventEnvelope) error {
@@ -49,8 +51,15 @@ func (a *PaymentAggregate) ApplyEvent(e *gen.EventEnvelope) error {
 	if err != nil {
 		return err
 	}
-
+	a.found = true
 	switch ev := ev.(type) {
+	case *AccountCreated:
+		if a.ID != ev.AccountID {
+			return errors.New("event does not belong to this payment aggregate")
+		}
+		a.ID = ev.AccountID
+		a.Balance = ev.Balance
+		a.Currency = ev.Currency
 	case *AccountDebited:
 		if a.ID != ev.AccountID {
 			return errors.New("event does not belong to this payment aggregate")
@@ -76,6 +85,30 @@ func (a *PaymentAggregate) ApplyCommand(ctx context.Context, c *gen.CommandEnvel
 	}
 
 	switch cmd := cmd.(type) {
+	case *CreateAccountCommand:
+		if cmd.Balance < 0 {
+			return nil, errors.New("initial balance cannot be negative")
+		}
+		if cmd.Currency == "" {
+			return nil, errors.New("currency cannot be empty")
+		}
+		a.ID = cmd.AccountID
+		a.Balance = cmd.Balance
+		a.Currency = cmd.Currency
+		ev := &AccountCreated{
+			AccountID: cmd.AccountID,
+			Currency:  cmd.Currency,
+			Balance:   cmd.Balance,
+			Ref:       cmd.Ref,
+			Timestamp: c.Timestamp.AsTime().Unix(),
+		}
+		var event *gen.EventEnvelope = &gen.EventEnvelope{AggregateId: cmd.AccountID}
+		event.AggregateType = "payments"
+		event.EventType = "credited"
+		b, _ := json.Marshal(ev)
+		event.Payload = b
+		return []*gen.EventEnvelope{event}, nil
+
 	case *DebitAccountCommand:
 		if cmd.Amount <= 0 {
 			return nil, errors.New("amount must be greater than zero")
