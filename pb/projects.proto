@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package example;
+
+option go_package = "gen/projectspb";
+
+import "pb/es_options.proto";
+
+
+// Command
+message CreateProjectCommand {
+  string id = 1 [(esoptions.aggregate_id) = true];
+  string title = 2;
+  string description = 3;
+}
+
+// Event
+message ProjectCreatedEvent {
+  string id = 1 [(esoptions.aggregate_id) = true];
+  string title = 2;
+  string description = 3;
+}

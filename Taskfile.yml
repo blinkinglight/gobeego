@@ -1,0 +1,14 @@
+# https://taskfile.dev
+
+version: '3'
+
+tasks:
+  proto-gen-bee:
+    desc: Generate Bee protobuf files
+    cmds:
+      - cd protoc-gen-bee/ && go install . && cd ../
+
+  default:
+    cmds:
+      - echo "Run 'task proto-gen-bee' to generate Bee protobuf files"
+    silent: true
