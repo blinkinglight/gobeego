@@ -1,0 +1,31 @@
+package pages
+
+import "github.com/blinkinglight/gobeego/web/layouts"
+import "github.com/blinkinglight/gobeego/pkg/collection"
+import "github.com/starfederation/datastar/sdk/go"
+
+
+templ Products(page collection.Product) {
+    @layouts.Main() {
+        <div data-on-load="@get('/cart/count')">
+            @CartCount(0)
+        </div>
+
+        <div>
+        @ProductItem(page)
+        </div>
+    }
+
+}
+
+templ ProductItem(page collection.Product) {
+    <div class="products">
+        for _ , product := range page.Products {
+            <div class="product-item">
+                <h3>{ product.Name }</h3>
+                <p>Price: { product.Price }</p>
+                <button class="add-to-cart" data-on-click={ datastar.PostSSE("/cart/add-product-id/%s", product.ID) }>Add to Cart</button>
+            </div>
+        }
+    </div>
+}

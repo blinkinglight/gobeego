@@ -1,0 +1,32 @@
+package pages
+
+import "github.com/blinkinglight/gobeego/web/layouts"
+import "github.com/blinkinglight/gobeego/pkg/collection"
+import "github.com/starfederation/datastar/sdk/go"
+
+templ Cart(page collection.Cart) {
+	@layouts.Main() {
+        <button type="button"  data-on-click={ datastar.PostSSE("/cart/add-product") }>Add random product to cart</button>
+		<div data-on-load="@get('/cart/live')" data-signals="{ pid : '' }">
+			@CartItems(page)
+		</div>
+	}
+}
+
+templ CartCount(cnt int) {
+    <div id="cart-count">
+        <p><a href="/cart">Total items in cart: { cnt }</a></p>
+    </div>
+}
+
+templ CartItems(page collection.Cart) {
+	<div id="items">
+		for _ , item := range page.Products {
+			<div class="cart-item">
+				<h3>{ item.ID }</h3>
+				<p>Price: { item.Price }</p>
+				<button class="remove-item" data-on-click={ datastar.PostSSE("/cart/remove/%s", item.ID) }>Remove</button>
+			</div>
+		}
+	</div>
+}

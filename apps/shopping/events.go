@@ -16,12 +16,6 @@ type CartDiscountApplied struct {
 	Discount float64 // Discount amount applied to the cart
 }
 
-type Product struct {
-	ID    string  // Unique identifier for the product
-	Name  string  // Name of the product
-	Price float64 // Price of the product
-}
-
 type UserCreated struct {
 	ID    string // Unique identifier for the user
 	Name  string // Name of the user

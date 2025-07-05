@@ -1,0 +1,1 @@
+{"Created":"2025-07-05T13:58:34.454178Z","Name":"R953VkpI","name":"R953VkpI","deliver_policy":"all","ack_policy":"explicit","ack_wait":30000000000,"max_deliver":-1,"filter_subject":"events.cart.cart-1.\u003e","replay_policy":"instant","max_ack_pending":1000,"deliver_subject":"_INBOX.K3nS5jX76EX08x0DAxmK0q","num_replicas":0,"metadata":{"_nats.req.level":"0"}}
