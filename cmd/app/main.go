@@ -161,7 +161,7 @@ func main() {
 		lctx := bee.WithJetStream(r.Context(), js)
 		lctx = bee.WithNats(lctx, nc)
 
-		agg := &CartCounterAggregate{}
+		agg := &CartCounterLiveProjection{}
 		updates := bee.ReplayAndSubscribe(lctx, agg, ro.WithAggreate("cart"), ro.WithAggregateID("cart-1"))
 		for {
 			select {
@@ -190,7 +190,7 @@ func main() {
 				time.Sleep(1 * time.Second)
 			}
 		}()
-		agg := &Aggregate{}
+		agg := &CartProjection{}
 		updates := bee.ReplayAndSubscribe(lctx, agg, ro.WithAggreate("cart"), ro.WithAggregateID("cart-1"))
 		for {
 			select {
@@ -222,12 +222,12 @@ func main() {
 
 }
 
-type CartCounterAggregate struct {
+type CartCounterLiveProjection struct {
 	Count int `json:"count"` // Count of items in the cart
 }
 
-// ApplyEvent applies an event to the CartCounterAggregate
-func (c *CartCounterAggregate) ApplyEvent(e *gen.EventEnvelope) error {
+// ApplyEvent applies an event to the CartCounterLiveProjection
+func (c *CartCounterLiveProjection) ApplyEvent(e *gen.EventEnvelope) error {
 	event, err := bee.UnmarshalEvent(e)
 	if err != nil {
 		return fmt.Errorf("unmarshal event: %w", err)
@@ -243,11 +243,11 @@ func (c *CartCounterAggregate) ApplyEvent(e *gen.EventEnvelope) error {
 	return nil
 }
 
-type Aggregate struct {
+type CartProjection struct {
 	Items []shopping.Product `json:"history"` // History of events applied to the aggregate
 }
 
-func (a *Aggregate) ApplyEvent(e *gen.EventEnvelope) error {
+func (a *CartProjection) ApplyEvent(e *gen.EventEnvelope) error {
 	event, err := bee.UnmarshalEvent(e)
 	if err != nil {
 		return fmt.Errorf("unmarshal event: %w", err)
