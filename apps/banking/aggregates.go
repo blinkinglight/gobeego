@@ -43,7 +43,8 @@ type PaymentAggregate struct {
 	Balance  int64 // pvz. centais
 	Currency string
 
-	found bool
+	found   bool
+	created bool
 }
 
 func (a *PaymentAggregate) ApplyEvent(e *gen.EventEnvelope) error {
@@ -57,6 +58,10 @@ func (a *PaymentAggregate) ApplyEvent(e *gen.EventEnvelope) error {
 		if a.ID != ev.AccountID {
 			return errors.New("event does not belong to this payment aggregate")
 		}
+		if a.created {
+			return errors.New("account already created")
+		}
+		a.created = true
 		a.ID = ev.AccountID
 		a.Balance = ev.Balance
 		a.Currency = ev.Currency

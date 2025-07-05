@@ -70,7 +70,7 @@ func TestMain(t *testing.T) {
 	ctx := bee.WithNats(t.Context(), nc)
 	ctx = bee.WithJetStream(ctx, js)
 
-	service := &banking.PaymentService{}
+	service := &banking.PaymentService{Ctx: ctx}
 	go bee.Command(ctx, service, co.WithAggreate(banking.Aggregate))
 
 	createCmd1 := banking.CreateAccount("54321", "USD", 0, "create-54321")

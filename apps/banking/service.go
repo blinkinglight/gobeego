@@ -9,11 +9,13 @@ import (
 	"github.com/blinkinglight/bee/ro"
 )
 
-type PaymentService struct{}
+type PaymentService struct {
+	Ctx context.Context
+}
 
-func (s *PaymentService) Handle(ctx context.Context, m *gen.CommandEnvelope) ([]*gen.EventEnvelope, error) {
+func (s *PaymentService) Handle(m *gen.CommandEnvelope) ([]*gen.EventEnvelope, error) {
 	agg := &PaymentAggregate{ID: m.AggregateId}
-	bee.Replay(ctx, agg, ro.WithAggreate(m.Aggregate), ro.WithAggregateID(m.AggregateId))
+	bee.Replay(s.Ctx, agg, ro.WithAggreate(m.Aggregate), ro.WithAggregateID(m.AggregateId))
 
 	if agg.found && m.CommandType == CreateCommand {
 		return nil, errors.New("account already exists")
@@ -21,5 +23,5 @@ func (s *PaymentService) Handle(ctx context.Context, m *gen.CommandEnvelope) ([]
 		return nil, errors.New("account does not exist")
 	}
 
-	return agg.ApplyCommand(ctx, m)
+	return agg.ApplyCommand(s.Ctx, m)
 }
