@@ -5,6 +5,8 @@ github.com/andybalholm/brotli v1.1.1 h1:PR2pgnyFznKEugtsUo0xLdDop5SKXd5Qf5ysW+7X
 github.com/andybalholm/brotli v1.1.1/go.mod h1:05ib4cKhjx3OQYUY22hTVd34Bc8upXjOLL2rKwwZBoA=
 github.com/blinkinglight/bee v0.0.4 h1:MYLZazer1ehP7VFF2rj4h+bP6+GUU0fLMD7Llbzargk=
 github.com/blinkinglight/bee v0.0.4/go.mod h1:d1GVtfTQn3uulj+ueOoJ3AKO7oNVkzVqOfcgiGVYzeA=
+github.com/blinkinglight/bee v0.0.13 h1:udiXUPOLHgcfrefnbAei9a6o2+DtKzXrhuUcehlnDYg=
+github.com/blinkinglight/bee v0.0.13/go.mod h1:d1GVtfTQn3uulj+ueOoJ3AKO7oNVkzVqOfcgiGVYzeA=
 github.com/cenkalti/backoff v2.2.1+incompatible h1:tNowT99t7UNflLxfYYSlKYsBpXdEet03Pg2g16Swow4=
 github.com/cenkalti/backoff v2.2.1+incompatible/go.mod h1:90ReRw6GdpyfrHakVjL/QHaoyV4aDUVVkXQJJJ3NXXM=
 github.com/chewxy/math32 v1.11.1 h1:b7PGHlp8KjylDoU8RrcEsRuGZhJuz8haxnKfuMMRqy8=

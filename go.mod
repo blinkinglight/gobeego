@@ -3,7 +3,7 @@ module github.com/blinkinglight/gobeego
 go 1.24.4
 
 require (
-	github.com/blinkinglight/bee v0.0.4
+	github.com/blinkinglight/bee v0.0.13
 	github.com/delaneyj/toolbelt v0.4.3
 	github.com/nats-io/nats-server/v2 v2.10.25
 	github.com/nats-io/nats.go v1.43.0
