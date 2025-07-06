@@ -25,3 +25,21 @@ type UserCreated struct {
 type CartAddedToUser struct {
 	CartID string `json:"cart_id"` // ID of the cart added to the user
 }
+
+type ProductCreated struct {
+	ID    string  // Unique identifier for the product
+	Name  string  // Name of the product
+	Price float64 // Price of the product
+}
+
+type ProductNameUpdated struct {
+	Name string // Name of the product
+}
+
+type ProductPriceUpdated struct {
+	Price float64 // Price of the product
+}
+
+type ProductDeleted struct {
+	ID string // Unique identifier for the product
+}

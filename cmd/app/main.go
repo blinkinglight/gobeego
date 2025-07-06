@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -13,9 +14,12 @@ import (
 	"github.com/blinkinglight/bee"
 	"github.com/blinkinglight/bee/co"
 	"github.com/blinkinglight/bee/gen"
+	"github.com/blinkinglight/bee/po"
 	"github.com/blinkinglight/bee/ro"
 	"github.com/blinkinglight/gobeego/apps/shopping"
+	"github.com/blinkinglight/gobeego/pkg/appctx"
 	"github.com/blinkinglight/gobeego/pkg/collection"
+	"github.com/blinkinglight/gobeego/pkg/rwdb"
 	"github.com/blinkinglight/gobeego/web/pages"
 	"github.com/delaneyj/toolbelt/embeddednats"
 	"github.com/go-chi/chi/v5"
@@ -59,8 +63,19 @@ func main() {
 	}
 
 	js.AddStream(&nats.StreamConfig{
-		Name:     "events",
+		Name:     "EVENTS",
 		Subjects: []string{"events.>"},
+		Storage:  nats.FileStorage,
+	})
+
+	db := rwdb.Open("./data/shopping.db")
+	ctx = appctx.WithDB(ctx, db)
+
+	db.WriteTX(ctx, func(tx *rwdb.Tx) error {
+		if err := tx.AutoMigrate(&shopping.Cart{}, &shopping.Product{}); err != nil {
+			return fmt.Errorf("migrate: %w", err)
+		}
+		return nil
 	})
 
 	ctx = bee.WithNats(ctx, nc)
@@ -69,19 +84,35 @@ func main() {
 	go bee.Command(ctx, &shopping.CartService{Ctx: ctx}, co.WithAggreate("cart"))
 	go bee.Command(ctx, &shopping.UserService{Ctx: ctx}, co.WithAggreate("user"))
 
-	products := []shopping.Product{
-		{ID: "prod-1", Name: "Product 1", Price: 10.0},
-		{ID: "prod-2", Name: "Product 2", Price: 20.0},
-		{ID: "prod-3", Name: "Product 3", Price: 30.0},
-		{ID: "prod-4", Name: "Product 4", Price: 40.0},
-		{ID: "prod-5", Name: "Product 5", Price: 50.0},
-	}
+	go bee.Command(ctx, &ProductService{Ctx: ctx}, co.WithAggreate("product"))
+	go bee.Project(ctx, &ProductProjection{Ctx: ctx}, po.WithAggreate("product"))
 
 	router := chi.NewRouter()
 
 	router.Get("/products", func(w http.ResponseWriter, r *http.Request) {
+		var products []shopping.Product
+		err := db.ReadTX(r.Context(), func(tx *rwdb.Tx) error {
+			return tx.Model(shopping.Product{}).Find(&products).Error
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to fetch products: %v", err), http.StatusInternalServerError)
+			return
+		}
 		pages.Products(collection.Product{
 			Products: products}).Render(r.Context(), w)
+	})
+
+	router.Get("/products/seed", func(w http.ResponseWriter, r *http.Request) {
+		for i := range 10 {
+			bee.PublishCommand(ctx, &gen.CommandEnvelope{
+				Aggregate:   "product",
+				AggregateId: fmt.Sprintf("prod-%d", time.Now().UnixNano()),
+				CommandType: "create",
+				Payload:     []byte(fmt.Sprintf(`{"name":"I: %d then - Product %d","price":10.0}`, i, time.Now().UnixNano())),
+			}, nil)
+		}
+		// <-msg
+		http.Redirect(w, r, "/products", http.StatusSeeOther)
 	})
 
 	router.Get("/cart", func(w http.ResponseWriter, r *http.Request) {
@@ -123,14 +154,15 @@ func main() {
 		lctx = bee.WithNats(lctx, nc)
 
 		product := shopping.Product{}
-		for _, p := range products {
-			if p.ID == id {
-				product = p
-				break
-			}
+		err := db.ReadTX(r.Context(), func(tx *rwdb.Tx) error {
+			return tx.Model(shopping.Product{}).Where("id = ?", id).First(&product).Error
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to fetch product: %v", err), http.StatusInternalServerError)
+			return
 		}
 
-		err := bee.PublishCommand(lctx, &gen.CommandEnvelope{
+		err = bee.PublishCommand(lctx, &gen.CommandEnvelope{
 			Aggregate:   "cart",
 			AggregateId: "cart-1",
 			CommandType: "add_item",
@@ -160,6 +192,39 @@ func main() {
 		sse := datastar.NewSSE(w, r)
 		lctx := bee.WithJetStream(r.Context(), js)
 		lctx = bee.WithNats(lctx, nc)
+
+		go func() {
+			aggProduct := &UpdateProductLiveProjection{}
+			updatesProducts := bee.ReplayAndSubscribe(lctx, aggProduct, ro.WithAggreate("product"), ro.WithAggregateID("*"))
+
+			for {
+				select {
+				case <-lctx.Done():
+					log.Println("Context done, stopping product updates")
+					return
+				case update := <-updatesProducts:
+					if update == nil {
+						log.Println("No updates received, stopping product updates")
+						return
+					}
+					if update.err != nil {
+						continue
+					}
+
+					var products []shopping.Product
+					db.ReadTX(r.Context(), func(tx *rwdb.Tx) error {
+						if err := tx.Model(shopping.Product{}).Find(&products).Error; err != nil {
+							log.Printf("Failed to fetch products: %v", err)
+							return err
+						}
+						return nil
+					})
+					sse.MergeFragmentTempl(pages.ProductItem(collection.Product{
+						Products: products,
+					}))
+				}
+			}
+		}()
 
 		agg := &CartCounterLiveProjection{}
 		updates := bee.ReplayAndSubscribe(lctx, agg, ro.WithAggreate("cart"), ro.WithAggregateID("cart-1"))
@@ -220,6 +285,25 @@ func main() {
 	log.Printf("Starting server on http://localhost:4321")
 	log.Fatal(http.ListenAndServe(":4321", router))
 
+}
+
+type UpdateProductLiveProjection struct {
+	err error
+}
+
+func (p *UpdateProductLiveProjection) ApplyEvent(e *gen.EventEnvelope) error {
+	event, err := bee.UnmarshalEvent(e)
+	if err != nil {
+		return fmt.Errorf("unmarshal event: %w", err)
+	}
+	p.err = nil // Reset error on each event
+	switch event.(type) {
+	case *shopping.ProductCreated:
+		return nil // Ignore product creation event
+	default:
+		p.err = errors.New("unsupported event type for UpdateProductLiveProjection")
+	}
+	return nil
 }
 
 type CartCounterLiveProjection struct {

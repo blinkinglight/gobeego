@@ -4,13 +4,16 @@ go 1.24.4
 
 require (
 	github.com/a-h/templ v0.3.906
-	github.com/blinkinglight/bee v0.0.13
+	github.com/blinkinglight/bee v0.0.17
 	github.com/delaneyj/toolbelt v0.5.0
+	github.com/glebarez/sqlite v1.11.0
 	github.com/go-chi/chi/v5 v5.2.0
+	github.com/ituoga/appcontext v0.0.1
 	github.com/ituoga/toolbox v0.0.6
 	github.com/nats-io/nats-server/v2 v2.11.6
 	github.com/nats-io/nats.go v1.43.0
 	github.com/starfederation/datastar v1.0.0-beta.11
+	gorm.io/gorm v1.30.0
 )
 
 require (
@@ -21,11 +24,14 @@ require (
 	github.com/delaneyj/gostar v0.8.0 // indirect
 	github.com/denisbrodbeck/machineid v1.0.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/glebarez/go-sqlite v1.21.2 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/google/go-tpm v0.9.5 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/igrmk/treemap/v2 v2.0.1 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.11 // indirect
 	github.com/lmittmann/tint v1.1.2 // indirect

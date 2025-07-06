@@ -26,6 +26,7 @@ func client() (*nats.Conn, func(), error) {
 			Trace:        true,
 			TraceVerbose: true,
 			Port:         4333,
+			StoreDir:     "./data/nats",
 		}),
 	)
 	if err != nil {

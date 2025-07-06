@@ -25,3 +25,21 @@ type UserCreate struct {
 type CartAddToUser struct {
 	CartID string // ID of the cart added to the user
 }
+
+type ProductCreate struct {
+	ID    string  // Unique identifier for the product
+	Name  string  // Name of the product
+	Price float64 // Price of the product
+}
+
+type ProductUpdateName struct {
+	Name string // New name of the product
+}
+
+type ProductUpdatePrice struct {
+	Price float64 // New price of the product
+}
+
+type ProductDelete struct {
+	ID string // Unique identifier for the product to be deleted
+}

@@ -6,7 +6,13 @@ import "github.com/starfederation/datastar/sdk/go"
 
 templ Cart(page collection.Cart) {
 	@layouts.Main() {
-        <button type="button"  data-on-click={ datastar.PostSSE("/cart/add-product") }>Add random product to cart</button>
+		<h1 class="mb-4 text-4xl font-extrabold leading-none tracking-tight text-gray-900 md:text-5xl lg:text-6xl">Cart</h1>
+		<div class="grid grid-cols-4 gap-4">
+			<a href="/products" class="focus:outline-none text-white bg-purple-700 hover:bg-purple-800 focus:ring-4 focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-2.5 mb-2 dark:bg-purple-600 dark:hover:bg-purple-700 dark:focus:ring-purple-900">Back to Products</a>
+			<button type="button" data-on-click={ datastar.PostSSE("/cart/add-product") }>Add random product to cart</button>
+			<div></div>
+			<div></div>
+		</div>
 		<div data-on-load="@get('/cart/live')" data-signals="{ pid : '' }">
 			@CartItems(page)
 		</div>
@@ -14,18 +20,18 @@ templ Cart(page collection.Cart) {
 }
 
 templ CartCount(cnt int) {
-    <div id="cart-count">
-        <p><a href="/cart">Total items in cart: { cnt }</a></p>
-    </div>
+	<div id="cart-count" class="inline-block focus:outline-none text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">
+		<p><a href="/cart">Total items in cart: { cnt }</a></p>
+	</div>
 }
 
 templ CartItems(page collection.Cart) {
-	<div id="items">
+	<div id="items" class="grid grid-cols-4 gap-4">
 		for _ , item := range page.Products {
-			<div class="cart-item">
+			<div class="cart-item border p-4 rounded-lg shadow-md bg-white">
 				<h3>{ item.ID }</h3>
 				<p>Price: { item.Price }</p>
-				<button class="remove-item" data-on-click={ datastar.PostSSE("/cart/remove/%s", item.ID) }>Remove</button>
+				<button class="focus:outline-none text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900" data-on-click={ datastar.PostSSE("/cart/remove/%s", item.ID) }>Remove</button>
 			</div>
 		}
 	</div>

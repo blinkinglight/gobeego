@@ -4,28 +4,29 @@ import "github.com/blinkinglight/gobeego/web/layouts"
 import "github.com/blinkinglight/gobeego/pkg/collection"
 import "github.com/starfederation/datastar/sdk/go"
 
-
 templ Products(page collection.Product) {
-    @layouts.Main() {
-        <div data-on-load="@get('/cart/count')">
-            @CartCount(0)
-        </div>
-
-        <div>
-        @ProductItem(page)
-        </div>
-    }
-
+	@layouts.Main() {
+		<h1 class="mb-4 text-4xl font-extrabold leading-none tracking-tight text-gray-900 md:text-5xl lg:text-6xl">Products</h1>
+        
+		<div class="grid grid-cols-4 gap-4">
+			<p><a href="/products/seed" class="focus:outline-none text-white bg-purple-700 hover:bg-purple-800 focus:ring-4 focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-2.5 mb-2 dark:bg-purple-600 dark:hover:bg-purple-700 dark:focus:ring-purple-900">Seed Products</a></p>
+			@CartCount(0)
+		</div>
+		<div data-on-load="@get('/cart/count')"></div>
+		<div>
+			@ProductItem(page)
+		</div>
+	}
 }
 
 templ ProductItem(page collection.Product) {
-    <div class="products">
-        for _ , product := range page.Products {
-            <div class="product-item">
-                <h3>{ product.Name }</h3>
-                <p>Price: { product.Price }</p>
-                <button class="add-to-cart" data-on-click={ datastar.PostSSE("/cart/add-product-id/%s", product.ID) }>Add to Cart</button>
-            </div>
-        }
-    </div>
+	<div id="products" class="grid grid-cols-4 gap-4">
+		for _ , product := range page.Products {
+			<div class="product-item border p-4 rounded-lg shadow-md bg-white">
+				<h3>{ product.Name }</h3>
+				<p>Price: { product.Price }</p>
+				<button data-on-click={ datastar.PostSSE("/cart/add-product-id/%s", product.ID) } class="text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-gray-800 dark:hover:bg-gray-700 dark:focus:ring-gray-700 dark:border-gray-700">Add to Cart</button>
+			</div>
+		}
+	</div>
 }
