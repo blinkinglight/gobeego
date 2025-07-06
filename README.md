@@ -2,6 +2,7 @@
 example of how to use bee 
 
 
+![GobeeGo](https://github.com/user-attachments/assets/061d47f5-cb1f-42e6-b8b2-e1114cfc66f3)
 
 
 
