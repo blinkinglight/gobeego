@@ -205,12 +205,18 @@ func main() {
 		lctx := bee.WithJetStream(r.Context(), js)
 		lctx = bee.WithNats(lctx, nc)
 
+		cir := shopping.CartItemRemove{
+			ProductID: id,
+			Product: shopping.Product{
+				ID: id,
+			},
+		}
+
 		err := bee.PublishCommand(lctx, &gen.CommandEnvelope{
 			Aggregate:   "cart",
 			AggregateId: "cart-1",
 			CommandType: "remove_item",
-			Payload:     []byte(fmt.Sprintf(`{"ProductID":"%s"}`, id)),
-		}, nil)
+		}, cir)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to remove item: %v", err), http.StatusInternalServerError)
 			return
@@ -314,7 +320,7 @@ func main() {
 					log.Println("No updates received, stopping cart count updates")
 					return
 				}
-				sse.MergeFragmentTempl(pages.CartCount(agg.Count))
+				sse.MergeFragmentTempl(pages.CartCount(agg.Count, agg.Total))
 			}
 		}
 	})
@@ -389,7 +395,6 @@ func (p *ProductLiveView) ApplyEvent(e *gen.EventEnvelope) error {
 		p.Product.Price = event.Price
 	case *shopping.ProductDeleted:
 		// Handle product deletion
-		p.err = errors.New("product deleted")
 	default:
 		p.err = errors.New("unsupported event type for UpdateProductLiveProjection")
 	}
@@ -416,7 +421,8 @@ func (p *UpdateProductLiveProjection) ApplyEvent(e *gen.EventEnvelope) error {
 }
 
 type CartCounterLiveProjection struct {
-	Count int `json:"count"` // Count of items in the cart
+	Count int     `json:"count"` // Count of items in the cart
+	Total float64 `json:"total"` // Total price of items in the cart
 }
 
 // ApplyEvent applies an event to the CartCounterLiveProjection
@@ -425,11 +431,13 @@ func (c *CartCounterLiveProjection) ApplyEvent(e *gen.EventEnvelope) error {
 	if err != nil {
 		return fmt.Errorf("unmarshal event: %w", err)
 	}
-	switch event.(type) {
+	switch event := event.(type) {
 	case *shopping.CartItemAdded:
 		c.Count++
+		c.Total += event.Product.Price
 	case *shopping.CartItemRemoved:
 		c.Count--
+		c.Total -= event.Product.Price
 	default:
 		return nil // Ignore other event types
 	}

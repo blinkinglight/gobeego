@@ -9,7 +9,8 @@ type CartItemAdd struct {
 }
 
 type CartItemRemove struct {
-	ProductID string // ID of the product being removed from the cart
+	ProductID string  // ID of the product being removed from the cart
+	Product   Product // Product being removed from the cart
 }
 
 type CartDiscountApply struct {
