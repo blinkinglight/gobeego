@@ -1,5 +1,5 @@
 # gobeego
-example of how to use bee 
+## example of how to use `bee` with https://data-star.dev for realtime web
 
 
 ![GobeeGo](https://github.com/user-attachments/assets/061d47f5-cb1f-42e6-b8b2-e1114cfc66f3)
