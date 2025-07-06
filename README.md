@@ -2,7 +2,7 @@
 ## example of how to use https://github.com/blinkinglight/bee with https://data-star.dev for realtime web
 
 
-![GobeeGo](https://github.com/user-attachments/assets/061d47f5-cb1f-42e6-b8b2-e1114cfc66f3)
+![GoBeeGo](https://github.com/user-attachments/assets/d99674e8-b371-4cf7-aad5-c09cd387c788)
 
 
 
