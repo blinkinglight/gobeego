@@ -23,10 +23,12 @@ import (
 	"github.com/blinkinglight/gobeego/web/pages"
 	"github.com/delaneyj/toolbelt/embeddednats"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/ituoga/toolbox"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	datastar "github.com/starfederation/datastar/sdk/go"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -113,6 +115,80 @@ func main() {
 		}
 		// <-msg
 		http.Redirect(w, r, "/products", http.StatusSeeOther)
+	})
+
+	router.Get("/product/{id}/live", func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		if id == "" {
+			http.Error(w, "Missing product ID", http.StatusBadRequest)
+			return
+		}
+
+		w.WriteHeader(200)
+		sse := datastar.NewSSE(w, r)
+		lctx := bee.WithJetStream(r.Context(), js)
+		lctx = bee.WithNats(lctx, nc)
+
+		agg := &ProductLiveView{}
+		updates := bee.ReplayAndSubscribe(lctx, agg, ro.WithAggreate("product"), ro.WithAggregateID(id))
+		for {
+			select {
+			case <-lctx.Done():
+				log.Println("Context done, stopping product updates")
+				return
+			case update := <-updates:
+				if update == nil {
+					log.Println("No updates received, stopping product updates")
+					return
+				}
+				sse.MergeFragmentTempl(pages.ProductSingleItem(update.Product))
+			}
+		}
+	})
+
+	router.Get("/product/create", func(w http.ResponseWriter, r *http.Request) {
+		id := uuid.NewString()
+		if id == "" {
+			http.Error(w, "Missing product ID", http.StatusBadRequest)
+			return
+		}
+		bee.PublishCommand(ctx, &gen.CommandEnvelope{
+			Aggregate:   "product",
+			AggregateId: id,
+			CommandType: "create",
+		}, &shopping.Product{
+			ID:    id,
+			Name:  fmt.Sprintf("Product %s", id),
+			Price: 10.0,
+		})
+		http.Redirect(w, r, fmt.Sprintf("/product/%s", id), http.StatusSeeOther)
+	})
+
+	router.Get("/product/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		if id == "" {
+			http.Error(w, "Missing product ID", http.StatusBadRequest)
+			return
+		}
+		bee.PublishCommand(ctx, &gen.CommandEnvelope{
+			Aggregate:   "product",
+			AggregateId: id,
+			CommandType: "create",
+		}, &shopping.Product{
+			ID:    id,
+			Name:  fmt.Sprintf("Product %s", id),
+			Price: 10.0,
+		})
+		var product shopping.Product
+		err := db.ReadTX(r.Context(), func(tx *rwdb.Tx) error {
+			return tx.Model(shopping.Product{}).Where("id = ?", id).First(&product).Error
+		})
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, fmt.Sprintf("Failed to fetch product: %v", err), http.StatusInternalServerError)
+			return
+		}
+		product.ID = id // Ensure product ID is set
+		pages.ProductSingle(product).Render(r.Context(), w)
 	})
 
 	router.Get("/cart", func(w http.ResponseWriter, r *http.Request) {
@@ -285,6 +361,39 @@ func main() {
 	log.Printf("Starting server on http://localhost:4321")
 	log.Fatal(http.ListenAndServe(":4321", router))
 
+}
+
+type ProductLiveView struct {
+	err     error
+	Product shopping.Product `json:"product"` // Current state of the product
+}
+
+func (p *ProductLiveView) ApplyEvent(e *gen.EventEnvelope) error {
+	event, err := bee.UnmarshalEvent(e)
+	if err != nil {
+		return fmt.Errorf("unmarshal event: %w", err)
+	}
+	p.err = nil                  // Reset error on each event
+	p.Product.ID = e.AggregateId // Set the product ID from the event
+	switch event := event.(type) {
+	case *shopping.ProductCreated:
+		// Handle product creation
+		p.Product.Name = event.Name
+		p.Product.Price = event.Price
+		return nil // Ignore product creation event
+	case *shopping.ProductNameUpdated:
+		// Handle product name update
+		p.Product.Name = event.Name
+	case *shopping.ProductPriceUpdated:
+		// Handle product price update
+		p.Product.Price = event.Price
+	case *shopping.ProductDeleted:
+		// Handle product deletion
+		p.err = errors.New("product deleted")
+	default:
+		p.err = errors.New("unsupported event type for UpdateProductLiveProjection")
+	}
+	return nil
 }
 
 type UpdateProductLiveProjection struct {

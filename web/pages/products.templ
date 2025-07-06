@@ -3,6 +3,7 @@ package pages
 import "github.com/blinkinglight/gobeego/web/layouts"
 import "github.com/blinkinglight/gobeego/pkg/collection"
 import "github.com/starfederation/datastar/sdk/go"
+import "github.com/blinkinglight/gobeego/apps/shopping"
 
 templ Products(page collection.Product) {
 	@layouts.Main() {
@@ -10,6 +11,7 @@ templ Products(page collection.Product) {
         
 		<div class="grid grid-cols-4 gap-4">
 			<p><a href="/products/seed" class="focus:outline-none text-white bg-purple-700 hover:bg-purple-800 focus:ring-4 focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-2.5 mb-2 dark:bg-purple-600 dark:hover:bg-purple-700 dark:focus:ring-purple-900">Seed Products</a></p>
+			<p><a href="/product/create" class="focus:outline-none text-white bg-purple-700 hover:bg-purple-800 focus:ring-4 focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-2.5 mb-2 dark:bg-purple-600 dark:hover:bg-purple-700 dark:focus:ring-purple-900">Create Products</a></p>
 			@CartCount(0)
 		</div>
 		<div data-on-load="@get('/cart/count')"></div>
@@ -29,4 +31,26 @@ templ ProductItem(page collection.Product) {
 			</div>
 		}
 	</div>
+}
+
+templ ProductSingle(product shopping.Product) {
+    @layouts.Main() {
+        <h1 class="mb-4 text-4xl font-extrabold leading-none tracking-tight text-gray-900 md:text-5xl lg:text-6xl">Product Details</h1>
+        <div class="grid grid-cols-4 gap-4">
+            <a href="/products" class="focus:outline-none text-white bg-purple-700 hover:bg-purple-800 focus:ring-4 focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-2.5 mb-2 dark:bg-purple-600 dark:hover:bg-purple-700 dark:focus:ring-purple-900">Back to Products</a>
+            <div></div>
+            <div></div>
+        </div>
+        <div data-on-load={ datastar.GetSSE("/product/%s/live", product.ID) }>
+        @ProductSingleItem(product)
+        </div>
+    }
+}
+
+templ ProductSingleItem(product shopping.Product) {
+    <div class="product-single border p-4 rounded-lg shadow-md bg-white" id="product-single">
+        <h3>{ product.Name }</h3>
+        <p>Price: { product.Price }</p>
+        <button data-on-click={ datastar.PostSSE("/cart/add-product-id/%s", product.ID) } class="text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-gray-800 dark:hover:bg-gray-700 dark:focus:ring-gray-700 dark:border-gray-700">Add to Cart</button>
+    </div>
 }
