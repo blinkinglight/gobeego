@@ -7,6 +7,7 @@ import (
 	"github.com/blinkinglight/bee"
 	"github.com/blinkinglight/bee/gen"
 	"github.com/blinkinglight/bee/ro"
+	"github.com/blinkinglight/gobeego/pkg/utils"
 )
 
 type CartService struct {
@@ -16,6 +17,24 @@ type CartService struct {
 func (s *CartService) Handle(m *gen.CommandEnvelope) ([]*gen.EventEnvelope, error) {
 	agg := &ShoppingCartAggregate{ID: m.AggregateId}
 	bee.Replay(s.Ctx, agg, ro.WithAggreate(m.Aggregate), ro.WithAggregateID(m.AggregateId))
+
+	evt, err := bee.UnmarshalCommand(m)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal event: %w", err)
+	}
+
+	switch evt := evt.(type) {
+	case *CartItemAdded:
+		productAgg := &ProductAggregate{ID: evt.Product.ID}
+		bee.Replay(s.Ctx, productAgg, ro.WithAggreate("product"), ro.WithAggregateID(evt.Product.ID))
+
+		m.Payload = utils.MustMarshal(Product{
+			ID:    productAgg.ID,
+			Name:  productAgg.Name,
+			Price: productAgg.Price,
+		})
+	}
+
 	return agg.ApplyCommand(m)
 }
 

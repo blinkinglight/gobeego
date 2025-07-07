@@ -209,14 +209,28 @@ func main() {
 		lctx := bee.WithJetStream(r.Context(), js)
 		lctx = bee.WithNats(lctx, nc)
 
+		var product shopping.Product
+		err := db.ReadTX(r.Context(), func(tx *rwdb.Tx) error {
+			return tx.Model(shopping.Product{}).Where("id = ?", id).First(&product).Error
+		})
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, fmt.Sprintf("Failed to fetch product: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		agg := &shopping.ProductAggregate{ID: id}
+		bee.Replay(lctx, agg, ro.WithAggreate("product"), ro.WithAggregateID(id))
+
 		cir := shopping.CartItemRemove{
 			ProductID: id,
 			Product: shopping.Product{
-				ID: id,
+				ID:    id,
+				Name:  agg.Name,
+				Price: agg.Price,
 			},
 		}
 
-		err := bee.PublishCommand(lctx, &gen.CommandEnvelope{
+		err = bee.PublishCommand(lctx, &gen.CommandEnvelope{
 			Aggregate:   "cart",
 			AggregateId: "cart-1",
 			CommandType: "remove_item",
@@ -359,116 +373,6 @@ func main() {
 	log.Printf("Starting server on http://localhost:4321")
 	log.Fatal(http.ListenAndServe(":4321", router))
 
-}
-
-type ProductLiveView struct {
-	err     error
-	Product shopping.Product `json:"product"` // Current state of the product
-}
-
-func (p *ProductLiveView) ApplyEvent(e *gen.EventEnvelope) error {
-	event, err := bee.UnmarshalEvent(e)
-	if err != nil {
-		return fmt.Errorf("unmarshal event: %w", err)
-	}
-	p.err = nil                  // Reset error on each event
-	p.Product.ID = e.AggregateId // Set the product ID from the event
-	switch event := event.(type) {
-	case *shopping.ProductCreated:
-		// Handle product creation
-		p.Product.Name = event.Name
-		p.Product.Price = event.Price
-		return nil // Ignore product creation event
-	case *shopping.ProductNameUpdated:
-		// Handle product name update
-		p.Product.Name = event.Name
-	case *shopping.ProductPriceUpdated:
-		// Handle product price update
-		p.Product.Price = event.Price
-	case *shopping.ProductDeleted:
-		// Handle product deletion
-	default:
-		p.err = errors.New("unsupported event type for UpdateProductLiveProjection")
-	}
-	return nil
-}
-
-type UpdateProductLiveProjection struct {
-	err      error
-	Products []shopping.Product `json:"products"` // List of products in the projection
-}
-
-func (p *UpdateProductLiveProjection) ApplyEvent(e *gen.EventEnvelope) error {
-	event, err := bee.UnmarshalEvent(e)
-	if err != nil {
-		return fmt.Errorf("unmarshal event: %w", err)
-	}
-	p.err = nil // Reset error on each event
-	switch event := event.(type) {
-	case *shopping.ProductCreated:
-		p.Products = append(p.Products, shopping.Product{
-			ID:    e.AggregateId,
-			Name:  event.Name,
-			Price: event.Price,
-		})
-		return nil // Ignore product creation event
-	default:
-		p.err = errors.New("unsupported event type for UpdateProductLiveProjection")
-	}
-	return nil
-}
-
-type CartCounterLiveProjection struct {
-	Count int     `json:"count"` // Count of items in the cart
-	Total float64 `json:"total"` // Total price of items in the cart
-}
-
-// ApplyEvent applies an event to the CartCounterLiveProjection
-func (c *CartCounterLiveProjection) ApplyEvent(e *gen.EventEnvelope) error {
-	event, err := bee.UnmarshalEvent(e)
-	if err != nil {
-		return fmt.Errorf("unmarshal event: %w", err)
-	}
-	switch event := event.(type) {
-	case *shopping.CartItemAdded:
-		c.Count++
-		c.Total += event.Product.Price
-	case *shopping.CartItemRemoved:
-		c.Count--
-		c.Total -= event.Product.Price
-	default:
-		return nil // Ignore other event types
-	}
-	return nil
-}
-
-type CartProjection struct {
-	Items []shopping.Product `json:"history"` // History of events applied to the aggregate
-}
-
-func (a *CartProjection) ApplyEvent(e *gen.EventEnvelope) error {
-	event, err := bee.UnmarshalEvent(e)
-	if err != nil {
-		return fmt.Errorf("unmarshal event: %w", err)
-	}
-	switch event := event.(type) {
-	case *shopping.CartItemAdded:
-		a.Items = append(a.Items, shopping.Product{
-			ID:    event.Product.ID,
-			Name:  event.Product.Name,
-			Price: event.Product.Price,
-		})
-	case *shopping.CartItemRemoved:
-		for i, p := range a.Items {
-			if p.ID == event.ProductID {
-				a.Items = append(a.Items[:i], a.Items[i+1:]...)
-				break
-			}
-		}
-	default:
-		return nil // Ignore other event types
-	}
-	return nil
 }
 
 func OverrideMethodByHeader(next http.Handler) http.Handler {

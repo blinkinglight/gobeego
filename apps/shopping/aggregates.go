@@ -157,3 +157,35 @@ func (u *UserAggregate) ApplyCommand(m *gen.CommandEnvelope) ([]*gen.EventEnvelo
 		return nil, fmt.Errorf("unknown command type: %T %v", cmd, m.CommandType)
 	}
 }
+
+type ProductAggregate struct {
+	ID    string
+	Name  string
+	Price float64
+	found bool
+}
+
+func (p *ProductAggregate) ApplyEvent(e *gen.EventEnvelope) error {
+	ev, err := bee.UnmarshalEvent(e)
+	if err != nil {
+		return err
+	}
+	p.found = true
+	switch evt := ev.(type) {
+	case *ProductCreated:
+		p.ID = e.AggregateId
+		p.Name = evt.Name
+		p.Price = evt.Price
+	case *ProductNameUpdated:
+		p.Name = evt.Name
+	case *ProductPriceUpdated:
+		p.Price = evt.Price
+	case *ProductDeleted:
+		p.ID = ""
+		p.Name = ""
+		p.Price = 0
+	default:
+		return fmt.Errorf("unknown event type: %T", ev)
+	}
+	return nil
+}
