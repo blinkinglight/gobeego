@@ -3,11 +3,13 @@ package shopping
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/blinkinglight/bee"
 	"github.com/blinkinglight/bee/gen"
 	"github.com/blinkinglight/bee/ro"
 	"github.com/blinkinglight/gobeego/pkg/utils"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type CartService struct {
@@ -24,15 +26,22 @@ func (s *CartService) Handle(m *gen.CommandEnvelope) ([]*gen.EventEnvelope, erro
 	}
 
 	switch evt := evt.(type) {
-	case *CartItemAdded:
-		productAgg := &ProductAggregate{ID: evt.Product.ID}
-		bee.Replay(s.Ctx, productAgg, ro.WithAggreate("product"), ro.WithAggregateID(evt.Product.ID))
+	case *CartItemRemove:
+		productAgg := &ProductAggregate{ID: evt.ProductID}
+		bee.Replay(s.Ctx, productAgg, ro.WithAggreate("product"), ro.WithAggregateID(evt.ProductID))
 
-		m.Payload = utils.MustMarshal(Product{
-			ID:    productAgg.ID,
-			Name:  productAgg.Name,
-			Price: productAgg.Price,
+		m.ExtraMetadata, err = structpb.NewStruct(map[string]any{
+			"product": utils.ToStructpbMap(&Product{
+				ID:    productAgg.ID,
+				Name:  productAgg.Name,
+				Price: productAgg.Price,
+			}),
 		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create extra metadata for product: %w", err)
+		}
+	default:
+		log.Printf("Unhandled command type: %T", evt)
 	}
 
 	return agg.ApplyCommand(m)

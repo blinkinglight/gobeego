@@ -5,6 +5,7 @@ import (
 
 	"github.com/blinkinglight/bee"
 	"github.com/blinkinglight/bee/gen"
+	"github.com/blinkinglight/gobeego/pkg/utils"
 )
 
 type ShoppingCartAggregate struct {
@@ -76,11 +77,18 @@ func (s *ShoppingCartAggregate) ApplyCommand(m *gen.CommandEnvelope) ([]*gen.Eve
 			Metadata:    m.Metadata,
 		}}, nil
 	case *CartItemRemove:
+		input := m.ExtraMetadata.AsMap()
+		var product Product
+		utils.FromStructpbMap(input["product"].(utils.M), &product)
+
 		return []*gen.EventEnvelope{{
 			AggregateId: m.AggregateId,
 			EventType:   "item_removed",
-			Payload:     m.Payload,
-			Metadata:    m.Metadata,
+			Payload: utils.MustMarshal(&CartItemRemoved{
+				ProductID: product.ID,
+				Product:   product,
+			}),
+			Metadata: m.Metadata,
 		}}, nil
 	case *CartDiscountApply:
 		return []*gen.EventEnvelope{{

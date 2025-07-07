@@ -22,6 +22,7 @@ func init() {
 	bee.RegisterEvent[ProductNameUpdated]("product", "name_updated")
 	bee.RegisterEvent[ProductPriceUpdated]("product", "price_updated")
 	bee.RegisterEvent[ProductDeleted]("product", "deleted")
+
 	bee.RegisterCommand[ProductCreate]("product", "create")
 	bee.RegisterCommand[ProductUpdateName]("product", "update_name")
 	bee.RegisterCommand[ProductUpdatePrice]("product", "update_price")

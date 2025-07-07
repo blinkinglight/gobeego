@@ -218,16 +218,8 @@ func main() {
 			return
 		}
 
-		agg := &shopping.ProductAggregate{ID: id}
-		bee.Replay(lctx, agg, ro.WithAggreate("product"), ro.WithAggregateID(id))
-
 		cir := shopping.CartItemRemove{
 			ProductID: id,
-			Product: shopping.Product{
-				ID:    id,
-				Name:  agg.Name,
-				Price: agg.Price,
-			},
 		}
 
 		err = bee.PublishCommand(lctx, &gen.CommandEnvelope{

@@ -1,10 +1,10 @@
 package shopping
 
 type Product struct {
-	ID     string  // Unique identifier for the product
-	CartID string  // ID of the cart this product belongs to
-	Name   string  // Name of the product
-	Price  float64 // Price of the product
+	ID     string  `json:"id"`      // Unique identifier for the product
+	CartID string  `json:"cart_id"` // ID of the cart this product belongs to
+	Name   string  `json:"name"`    // Name of the product
+	Price  float64 `json:"price"`   // Price of the product
 }
 
 type Cart struct {
