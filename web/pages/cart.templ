@@ -13,8 +13,9 @@ templ Cart(page collection.Cart) {
 			<div></div>
 			<div></div>
 		</div>
-		<div data-on-load="@get('/cart/live')" data-signals="{ pid : '' }">
-			@CartItems(page)
+		<div data-signals="{ pid : '' }">
+			// @CartItems(page)
+			@Loader("items", "/cart/live")
 		</div>
 	}
 }

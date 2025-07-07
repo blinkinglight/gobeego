@@ -33,6 +33,8 @@ import (
 
 func main() {
 	ctx := context.Background()
+	// datastar.WithGzip(datastar.WithGzipLevel(9))
+	datastar.WithBrotli()
 
 	ex, err := os.Executable()
 	if err != nil {
@@ -54,6 +56,7 @@ func main() {
 
 	ns.WaitForServer()
 	nc, err := ns.Client()
+	// nc, err := nats.Connect("nats://localhost:4222", nats.Name("gobeego shopping app"))
 	if err != nil {
 		panic(err)
 	}
@@ -89,9 +92,15 @@ func main() {
 	go bee.Command(ctx, &ProductService{Ctx: ctx}, co.WithAggreate("product"))
 	go bee.Project(ctx, &ProductProjection{Ctx: ctx}, po.WithAggreate("product"))
 
+	chi.RegisterMethod("DS_GET")
+	chi.RegisterMethod("DS_POST")
+
 	router := chi.NewRouter()
 
+	router.Use(OverrideMethodByHeader)
+
 	router.Get("/products", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
 		var products []shopping.Product
 		err := db.ReadTX(r.Context(), func(tx *rwdb.Tx) error {
 			return tx.Model(shopping.Product{}).Find(&products).Error
@@ -104,7 +113,7 @@ func main() {
 			Products: products}).Render(r.Context(), w)
 	})
 
-	router.Get("/products/seed", func(w http.ResponseWriter, r *http.Request) {
+	router.MethodFunc("DS_GET", "/products/seed", func(w http.ResponseWriter, r *http.Request) {
 		for i := range 10 {
 			bee.PublishCommand(ctx, &gen.CommandEnvelope{
 				Aggregate:   "product",
@@ -113,11 +122,11 @@ func main() {
 				Payload:     []byte(fmt.Sprintf(`{"name":"I: %d then - Product %d","price":10.0}`, i, time.Now().UnixNano())),
 			}, nil)
 		}
-		// <-msg
-		http.Redirect(w, r, "/products", http.StatusSeeOther)
+		w.WriteHeader(200)
+		datastar.NewSSE(w, r)
 	})
 
-	router.Get("/product/{id}/live", func(w http.ResponseWriter, r *http.Request) {
+	router.MethodFunc("DS_GET", "/product/{id}/live", func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		if id == "" {
 			http.Error(w, "Missing product ID", http.StatusBadRequest)
@@ -141,6 +150,7 @@ func main() {
 					log.Println("No updates received, stopping product updates")
 					return
 				}
+
 				sse.MergeFragmentTempl(pages.ProductSingleItem(update.Product))
 			}
 		}
@@ -170,15 +180,7 @@ func main() {
 			http.Error(w, "Missing product ID", http.StatusBadRequest)
 			return
 		}
-		bee.PublishCommand(ctx, &gen.CommandEnvelope{
-			Aggregate:   "product",
-			AggregateId: id,
-			CommandType: "create",
-		}, &shopping.Product{
-			ID:    id,
-			Name:  fmt.Sprintf("Product %s", id),
-			Price: 10.0,
-		})
+
 		var product shopping.Product
 		err := db.ReadTX(r.Context(), func(tx *rwdb.Tx) error {
 			return tx.Model(shopping.Product{}).Where("id = ?", id).First(&product).Error
@@ -188,14 +190,16 @@ func main() {
 			return
 		}
 		product.ID = id // Ensure product ID is set
+		w.WriteHeader(200)
 		pages.ProductSingle(product).Render(r.Context(), w)
 	})
 
 	router.Get("/cart", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
 		pages.Cart(collection.Cart{}).Render(r.Context(), w)
 	})
 
-	router.Post("/cart/remove/{id}", func(w http.ResponseWriter, r *http.Request) {
+	router.MethodFunc("DS_POST", "/cart/remove/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		if id == "" {
 			http.Error(w, "Missing product ID", http.StatusBadRequest)
@@ -221,11 +225,11 @@ func main() {
 			http.Error(w, fmt.Sprintf("Failed to remove item: %v", err), http.StatusInternalServerError)
 			return
 		}
-
+		w.WriteHeader(200)
 		datastar.NewSSE(w, r)
 	})
 
-	router.Post("/cart/add-product-id/{id}", func(w http.ResponseWriter, r *http.Request) {
+	router.MethodFunc("DS_POST", "/cart/add-product-id/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		if id == "" {
 			http.Error(w, "Missing product ID", http.StatusBadRequest)
@@ -254,10 +258,10 @@ func main() {
 			http.Error(w, fmt.Sprintf("Failed to add item: %v", err), http.StatusInternalServerError)
 			return
 		}
-
+		w.WriteHeader(200)
 		datastar.NewSSE(w, r)
 	})
-	router.Post("/cart/add-product", func(w http.ResponseWriter, r *http.Request) {
+	router.MethodFunc("DS_POST", "/cart/add-product", func(w http.ResponseWriter, r *http.Request) {
 		lctx := bee.WithJetStream(r.Context(), js)
 		lctx = bee.WithNats(lctx, nc)
 		bee.PublishCommand(lctx, &gen.CommandEnvelope{
@@ -266,77 +270,65 @@ func main() {
 			CommandType: "add_item",
 			Payload:     []byte(fmt.Sprintf(`{"product":{"ID":"prod-%d","name":"Product %d","price":%d}}`, time.Now().UnixNano(), time.Now().UnixNano(), rand.Intn(100))),
 		}, nil)
+		w.WriteHeader(200)
 		datastar.NewSSE(w, r)
 	})
 
-	router.Get("/cart/count", func(w http.ResponseWriter, r *http.Request) {
+	router.MethodFunc("DS_GET", "/cart/count", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		sse := datastar.NewSSE(w, r)
 		lctx := bee.WithJetStream(r.Context(), js)
 		lctx = bee.WithNats(lctx, nc)
 
-		go func() {
-			aggProduct := &UpdateProductLiveProjection{}
-			updatesProducts := bee.ReplayAndSubscribe(lctx, aggProduct, ro.WithAggreate("product"), ro.WithAggregateID("*"))
-
-			for {
-				select {
-				case <-lctx.Done():
-					log.Println("Context done, stopping product updates")
-					return
-				case update := <-updatesProducts:
-					if update == nil {
-						log.Println("No updates received, stopping product updates")
-						return
-					}
-					if update.err != nil {
-						continue
-					}
-
-					var products []shopping.Product
-					db.ReadTX(r.Context(), func(tx *rwdb.Tx) error {
-						if err := tx.Model(shopping.Product{}).Find(&products).Error; err != nil {
-							log.Printf("Failed to fetch products: %v", err)
-							return err
-						}
-						return nil
-					})
-					sse.MergeFragmentTempl(pages.ProductItem(collection.Product{
-						Products: products,
-					}))
-				}
-			}
-		}()
+		aggProduct := &UpdateProductLiveProjection{}
+		updatesProducts := bee.ReplayAndSubscribe(lctx, aggProduct, ro.WithAggreate("product"), ro.WithAggregateID("*"))
 
 		agg := &CartCounterLiveProjection{}
 		updates := bee.ReplayAndSubscribe(lctx, agg, ro.WithAggreate("cart"), ro.WithAggregateID("cart-1"))
-		for {
-			select {
-			case <-lctx.Done():
-				log.Println("Context done, stopping cart count updates")
-				return
-			case update := <-updates:
-				if update == nil {
-					log.Println("No updates received, stopping cart count updates")
+		go func() {
+			for {
+				select {
+				case <-lctx.Done():
+					log.Println("Context done, stopping cart count updates")
 					return
+				case update1 := <-updatesProducts:
+					if update1 == nil {
+						log.Println("No updates received, stopping product updates")
+						return
+					}
+					if update1.err != nil {
+						log.Printf("Error in UpdateProductLiveProjection: %v", update1.err)
+						continue
+					}
+
+					// db.ReadTX(r.Context(), func(tx *rwdb.Tx) error {
+					// 	if err := tx.Model(shopping.Product{}).Find(&products).Error; err != nil {
+					// 		log.Printf("Failed to fetch products: %v", err)
+					// 		return err
+					// 	}
+					// 	return nil
+					// })
+					sse.MergeFragmentTempl(pages.ProductItem(collection.Product{
+						Products: update1.Products,
+					}))
+				case update := <-updates:
+					if update == nil {
+						log.Println("No updates received, stopping cart count updates")
+						return
+					}
+					sse.MergeFragmentTempl(pages.CartCount(agg.Count, agg.Total))
 				}
-				sse.MergeFragmentTempl(pages.CartCount(agg.Count, agg.Total))
 			}
-		}
+		}()
+		<-lctx.Done() // Wait for context to be done
 	})
 
-	router.Get("/cart/live", func(w http.ResponseWriter, r *http.Request) {
+	router.MethodFunc("DS_GET", "/cart/live", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		sse := datastar.NewSSE(w, r)
 		lctx := bee.WithJetStream(r.Context(), js)
 		lctx = bee.WithNats(lctx, nc)
 
-		go func() {
-			for range 5 {
-
-				time.Sleep(1 * time.Second)
-			}
-		}()
 		agg := &CartProjection{}
 		updates := bee.ReplayAndSubscribe(lctx, agg, ro.WithAggreate("cart"), ro.WithAggregateID("cart-1"))
 		for {
@@ -402,7 +394,8 @@ func (p *ProductLiveView) ApplyEvent(e *gen.EventEnvelope) error {
 }
 
 type UpdateProductLiveProjection struct {
-	err error
+	err      error
+	Products []shopping.Product `json:"products"` // List of products in the projection
 }
 
 func (p *UpdateProductLiveProjection) ApplyEvent(e *gen.EventEnvelope) error {
@@ -411,8 +404,13 @@ func (p *UpdateProductLiveProjection) ApplyEvent(e *gen.EventEnvelope) error {
 		return fmt.Errorf("unmarshal event: %w", err)
 	}
 	p.err = nil // Reset error on each event
-	switch event.(type) {
+	switch event := event.(type) {
 	case *shopping.ProductCreated:
+		p.Products = append(p.Products, shopping.Product{
+			ID:    e.AggregateId,
+			Name:  event.Name,
+			Price: event.Price,
+		})
 		return nil // Ignore product creation event
 	default:
 		p.err = errors.New("unsupported event type for UpdateProductLiveProjection")
@@ -471,4 +469,13 @@ func (a *CartProjection) ApplyEvent(e *gen.EventEnvelope) error {
 		return nil // Ignore other event types
 	}
 	return nil
+}
+
+func OverrideMethodByHeader(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("datastar-request") != "" {
+			r.Method = "DS_" + r.Method
+		}
+		next.ServeHTTP(w, r)
+	})
 }

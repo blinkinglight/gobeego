@@ -4,19 +4,22 @@ import "github.com/blinkinglight/gobeego/web/layouts"
 import "github.com/blinkinglight/gobeego/pkg/collection"
 import "github.com/starfederation/datastar/sdk/go"
 import "github.com/blinkinglight/gobeego/apps/shopping"
+import "fmt"
 
 templ Products(page collection.Product) {
 	@layouts.Main() {
 		<h1 class="mb-4 text-4xl font-extrabold leading-none tracking-tight text-gray-900 md:text-5xl lg:text-6xl">Products</h1>
         
 		<div class="grid grid-cols-4 gap-4">
-			<p><a href="/products/seed" class="focus:outline-none text-white bg-purple-700 hover:bg-purple-800 focus:ring-4 focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-2.5 mb-2 dark:bg-purple-600 dark:hover:bg-purple-700 dark:focus:ring-purple-900">Seed Products</a></p>
+			<p><button type="button" data-on-click="@get('/products/seed')" class="focus:outline-none text-white bg-purple-700 hover:bg-purple-800 focus:ring-4 focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-2.5 mb-2 dark:bg-purple-600 dark:hover:bg-purple-700 dark:focus:ring-purple-900">Seed Products</button></p>
 			<p><a href="/product/create" class="focus:outline-none text-white bg-purple-700 hover:bg-purple-800 focus:ring-4 focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-2.5 mb-2 dark:bg-purple-600 dark:hover:bg-purple-700 dark:focus:ring-purple-900">Create Products</a></p>
 			@CartCount(0,0)
 		</div>
-		<div data-on-load="@get('/cart/count')"></div>
+		<div ></div>
 		<div>
-			@ProductItem(page)
+			// @ProductItem(page)
+            @Loader("products", "/cart/count")
+            // @Loader("items", "/cart/live")
 		</div>
 	}
 }
@@ -41,8 +44,10 @@ templ ProductSingle(product shopping.Product) {
             <div></div>
             <div></div>
         </div>
-        <div data-on-load={ datastar.GetSSE("/product/%s/live", product.ID) }>
-        @ProductSingleItem(product)
+        // <div data-on-load={ datastar.GetSSE("/product/%s/live", product.ID) }>
+        <div>
+        // @ProductSingleItem(product)
+        @Loader("product-single", fmt.Sprintf("/product/%s/live", product.ID))
         </div>
     }
 }
